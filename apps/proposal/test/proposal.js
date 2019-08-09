@@ -1,4 +1,4 @@
-const namehash = require('eth-ens-namehash').hash;
+const namehash = require('ethers').utils.namehash;
 
 // eslint-disable-next-line no-undef
 const Proposal = artifacts.require("Proposal.sol");
@@ -56,7 +56,7 @@ contract('Proposal app', (accounts) => {
     proposal = Proposal.at(
       receipt.logs.filter(l => l.event == 'NewAppProxy')[0].args.proxy
     );
-
+    
     receipt = await dao.newAppInstance(
       appsId[1],
       (await Contributor.new()).address,
@@ -67,7 +67,7 @@ contract('Proposal app', (accounts) => {
     contributor = Contributor.at(
       receipt.logs.filter(l => l.event == 'NewAppProxy')[0].args.proxy
     );
-
+    
     receipt = await dao.newAppInstance(
       appsId[0],
       (await Contribution.new()).address,
@@ -78,10 +78,9 @@ contract('Proposal app', (accounts) => {
     contribution = Contribution.at(
       receipt.logs.filter(l => l.event == 'NewAppProxy')[0].args.proxy
     );
-
+    
     //init app
     await proposal.initialize(appsId);
-
     await acl.createPermission(
       root,
       proposal.address,
@@ -89,7 +88,6 @@ contract('Proposal app', (accounts) => {
       root,
       { from: root }
     );
-
     await acl.createPermission(
       root,
       proposal.address,
@@ -97,10 +95,9 @@ contract('Proposal app', (accounts) => {
       root,
       { from: root }
     );
-
+    
     //init contribution (app)
     await contribution.initialize(appsId);
-  
     await acl.createPermission(
       root,
       contribution.address,
@@ -108,7 +105,6 @@ contract('Proposal app', (accounts) => {
       root,
       { from: root }
     );
-
     await acl.createPermission(
       root,
       contribution.address,
@@ -116,12 +112,10 @@ contract('Proposal app', (accounts) => {
       root,
       { from: root }
     );
-
-    //acl.grantPermission(proposal, contribution, await contribution.ADD_CONTRIBUTION_ROLE(), {from: root});            
-
+    await acl.grantPermission(proposal.address, contribution.address, await contribution.ADD_CONTRIBUTION_ROLE(), {from: root});            
+    
     //init contributor app
-    await contributor.initialize(appsId);
-
+    await contributor.initialize(root, appsId);
     await acl.createPermission(
       root,
       contributor.address,
@@ -129,6 +123,7 @@ contract('Proposal app', (accounts) => {
       root,
       { from: root }
     );
+    
   });
 
   describe("Owner default permissions", async () => {
@@ -149,7 +144,13 @@ contract('Proposal app', (accounts) => {
       // eslint-disable-next-line no-undef
       assert.equal(addContributionPermission, true);
     });   
-
+    
+    it('check proposal app can add contribution', async () => {
+      let addContributionPermission = await acl.hasPermission(proposal.address, contribution.address, await contribution.ADD_CONTRIBUTION_ROLE());
+      // eslint-disable-next-line no-undef
+      assert.equal(addContributionPermission, true);
+    });  
+    
     it('check owner can veto contribution', async () => {
       let vetoContributionPermission = await acl.hasPermission(root, contribution.address, await contribution.VETO_CONTRIBUTION_ROLE());
       // eslint-disable-next-line no-undef
@@ -157,10 +158,40 @@ contract('Proposal app', (accounts) => {
     });  
 
     it('check owner can manage contributors', async () => {
-      let manageContributorsPermission = await acl.hasPermission(root, contributor.address, await contribution.MANAGE_CONTRIBUTORS_ROLE());
+      let manageContributorsPermission = await acl.hasPermission(root, contributor.address, await contributor.MANAGE_CONTRIBUTORS_ROLE());
       // eslint-disable-next-line no-undef
       assert.equal(manageContributorsPermission, true);
     });  
+  });
+
+  describe('Add proposal', async () => {
+    let contributorId;
+    let account = root;
+    let amount = 10;
+    let hashDigest = '0x0';
+    let hashFunction = 0;
+    let hashSize = 0;
+    
+    // eslint-disable-next-line no-undef
+    before(async () => {
+      // add contributor
+      await contributor.addContributor(account, hashDigest, hashFunction, hashSize);
+      contributorId = await contributor.contributorsCount();
+      // eslint-disable-next-line no-undef
+      assert.equal(await contributor.exists(contributorId), true);
+    });
+    
+    it('add proposal', async () => {
+      let proposalCountBefore = await proposal.proposalsCount();
+      await proposal.addProposal(contributorId.toNumber(), amount, hashDigest, hashFunction, hashSize, {from: root});
+      let proposalCountAfter = await proposal.proposalsCount();
+      // eslint-disable-next-line no-undef
+      assert.equal(await proposalCountAfter.toNumber(), parseInt(proposalCountBefore)+1, "proposal added");
+      let proposalObject = await proposal.getProposal(proposalCountAfter.toNumber());
+      // eslint-disable-next-line no-undef
+      assert.equal(proposalObject[11], true, "proposal exist");
+    });
+
   });
 
 });
