@@ -7,16 +7,6 @@ import "@aragon/os/contracts/common/EtherTokenConstant.sol";
 import "@aragon/os/contracts/common/SafeERC20.sol";
 import "@aragon/os/contracts/lib/token/ERC20.sol";
 
-interface IContributor {
-  function getContributorAddressById(uint32 id) view public returns (address);
-  function contributorsCount() view public returns (uint32);
-}
-
-interface IToken {
-  function balanceOf(address owner) public view returns (uint256);
-  function totalSupply() public view returns (uint256);
-}
-
 contract Vault is EtherTokenConstant, AragonApp, DepositableStorage {
   using SafeERC20 for ERC20;
 
@@ -54,40 +44,6 @@ contract Vault is EtherTokenConstant, AragonApp, DepositableStorage {
 
     appIds = _appIds;
     setDepositable(true);
-  }
-
-  function getContract(uint8 appId) public view returns (address) {
-    IKernel k = IKernel(kernel());
-    return k.getApp(KERNEL_APP_ADDR_NAMESPACE, appIds[appId]);
-  }
-
-  function getContributorAddressById(uint32 contributorId) public view returns (address) {
-    address contributor = getContract(uint8(Apps.Contributor));
-    return IContributor(contributor).getContributorAddressById(contributorId);
-  }
-
-  function getContributorsAddresses() internal view returns (address[]) {
-    address contributor = getContract(uint8(Apps.Contributor));
-    uint32 contributorsCount = IContributor(contributor).contributorsCount();
-
-    address[] memory contributorsAddresses = new address[](contributorsCount);
-
-    for(uint32 i = 1; i <= contributorsCount; i++) {
-      address contributorAddress = IContributor(contributor).getContributorAddressById(i);
-      contributorsAddresses[i-1] = contributorAddress;
-    }
-
-    return contributorsAddresses;
-  }
-
-  function balanceOf(address owner) public view returns (uint256) {
-    address token = getContract(uint8(Apps.Token));
-    return IToken(token).balanceOf(owner);
-  }
-
-  function totalSupply() public view returns (uint256) {
-    address token = getContract(uint8(Apps.Token));
-    return IToken(token).totalSupply();
   }
 
   /**
